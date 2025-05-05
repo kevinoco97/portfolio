@@ -1,0 +1,185 @@
+---
+title: "Google Data Analytics Capstone: Cyclistic Case Study"
+author: "Kevin O'Connor"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readr)   # For read_csv()
+library(purrr)   # For map()
+library(dplyr)   # For bind_rows()
+library(ggplot2)
+library(scales)
+library(lubridate)
+library(knitr)
+opts_chunk$set(echo = FALSE)
+#tinytex::install_tinytex(force=TRUE) #to export to pdf
+```
+
+# Introduction
+A fictional Chicago bike-share company Cyclistic is looking to maximize their number of annual memberships.
+
+As a data analyst, I am tasked with exploring how Cyclistic's "casual" and annual member riders use the Cyclistic bikes differently. 
+
+Data insights from this analysis will drive a marketing campaign aimed at converting casual riders into annual members.
+
+Key stakeholders of this analysis are the Cyclistic executive team as well as the director of marketing.
+
+<br>
+
+## Prepare the Data
+The data collected for this analysis has been gathered from a real bike-share company, Divvy. Historical data spanning 12 months from the entire 2024 year and was provided under a Data Licence Agreement from https://divvybikes.com/data-license-agreement.
+
+Due to privacy concerns, personally identifiable information for riders were not supplied within the dataset. Considering this limitation, it should be noted that we are unable to leverage insights on where riders live in relation to the bikes and whether the same rider is buying multiple rides.
+
+
+
+```{r include=FALSE}
+
+jan24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202401-divvy-tripdata.csv")
+feb24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202402-divvy-tripdata.csv")
+mar24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202403-divvy-tripdata.csv")
+apr24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202404-divvy-tripdata.csv")
+may24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202405-divvy-tripdata.csv")
+jun24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202406-divvy-tripdata.csv")
+jul24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202407-divvy-tripdata.csv")
+aug24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202408-divvy-tripdata.csv")
+sep24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202409-divvy-tripdata.csv")
+oct24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202410-divvy-tripdata.csv")
+nov24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202411-divvy-tripdata.csv")
+dec24_df <- read_csv("C:/Users/kevin/OneDrive/Documents/Rprojects/Google_case_study/data/202412-divvy-tripdata.csv")
+
+
+all_trips <- rbind(jan24_df, feb24_df, mar24_df, apr24_df, may24_df, jun24_df, jul24_df, aug24_df, sep24_df, oct24_df, nov24_df, dec24_df)
+
+```
+
+Key transformations of the data include:
+
+* Creating a ride length column from existing data to highlight how long each ride was in minutes.
+* Filtering out bad data in which ride length time was negative.
+* Created additional columns for month, day, year, day of the week to further breakdown the data and prepare to analyze on more variables.
+
+
+```{r include=FALSE}
+# Create column for ride length in minutes
+all_trips$ride_length <- difftime(all_trips$ended_at,all_trips$started_at, units = "mins")
+```
+
+```{r include=FALSE}
+# Create column for date, yyyy-mm-dd
+all_trips$date <- as.Date(all_trips$started_at)
+```
+
+```{r include=FALSE}
+# Creating columns for month, day, year, day of week
+all_trips$month <- format(as.Date(all_trips$date), "%m")
+all_trips$day <- format(as.Date(all_trips$date), "%d")
+all_trips$year <- format(as.Date(all_trips$date), "%Y")
+all_trips$day_of_week <- format(as.Date(all_trips$date), "%A")
+```
+
+```{r include=FALSE}
+# new dateframe, dropping rows with negative ride length time
+all_trips_v2 <- all_trips %>% 
+  filter(ride_length >= 0)
+```
+
+<br>
+
+## Data Analysis
+
+```{r echo=FALSE, message=FALSE}
+
+# visualization for number of rides per month but separate into 2 graphs for each rider type
+all_trips_v2 %>% 
+  mutate(month=month(started_at, label = TRUE)) %>% 
+  group_by(member_casual, month) %>% 
+  summarise(number_of_rides=n(), average_duration=mean(ride_length)) %>% 
+  arrange(member_casual, month) %>% 
+  ggplot(aes(x=month,y=number_of_rides,fill=member_casual)) +
+  geom_col(position="dodge")+
+  facet_wrap(~member_casual, ncol=1) +
+  scale_y_continuous(labels=comma) +
+  labs(title="Monthly Ride Count by Rider Type",
+       x="Month",
+       y="Number of rides",
+       fill="Rider Type"
+  ) +
+  theme_minimal()
+```
+
+* For both **Members and Casual** riders, ridership is much more popular in the warmer months of Chicago (May-Oct).
+
+<br>
+<br>
+
+```{r echo=FALSE, message=FALSE}
+# # visualization for number of rides by rider type per weekday
+all_trips_v2 %>%
+  mutate(weekday=wday(started_at, label = TRUE)) %>%
+  group_by(member_casual, weekday) %>%
+  summarise(number_of_rides=n(), average_duration=mean(ride_length)) %>%
+  arrange(member_casual, weekday) %>%
+  ggplot(aes(x=weekday,y=number_of_rides,fill=member_casual)) +
+  geom_col(position="dodge") +
+  scale_y_continuous(labels=comma) +
+  labs(title="Weekday Ride Count by Rider Type",
+       x="Weekday",
+       y="Number of rides",
+       fill="Rider Type"
+  ) +
+  theme_minimal()
+```
+
+* **Members** have higher number of rides during the week versus the weekend while **Casual** riders demonstrate the opposite trend.
+
+<br>
+<br>
+
+```{r echo=FALSE, message=FALSE}
+all_trips_v2 %>% 
+  mutate(hour=hour(started_at)) %>% 
+  group_by(member_casual,hour) %>% 
+  summarise(number_of_rides=n()) %>% 
+  arrange(member_casual,hour) %>% 
+  ggplot(aes(x=hour,y=number_of_rides,fill=member_casual)) +
+  geom_bar(stat="identity", position="dodge") +
+  scale_y_continuous(labels=comma) +
+  labs(title="Ride Count breakdown by Hour",
+       x="Hour of Day",
+       y="Number of Rides",
+       fill="Rider Type"
+  ) +
+  theme_minimal()
+```
+
+* For **Members**, there is a significant spike during work commuting hours, while **Casual** riders have a more normal distribution.
+
+<br>
+<br>
+
+## Insights
+* Ride volume increases significantly during the warmer months regardless of rider type.
+* Members ride more often during the week versus the weekend while casual riders demonstrate the opposite with greater rides on the weekend.
+* Based the time of day of member rides, it appears members are more likely to be using the bikes for daily commuting to workplaces.
+
+
+
+
+## Recommendations
+* Offer a seasonal package, focusing on warmer months where bike riding is more popular. This may especially be valuable to those casual riders who may live in the area but only ride for recreational weekend activities.
+* Offer week and/or weekend passes. While a tourist may have no practical use for an annual or seasonal membership, a week or weekend pass may be enticing to cover their duration of their stay in Chicago.
+* Marketing wise, advertisement volume for the seasonal package should be maximized in the months leading into Spring and Summer. To specifically leverage the tourist crowd, the advertisements for the week and weekend passes could be located around popular lodging areas.
+
+
+## Other factors to consider
+* As stated earlier, personal information was not provided within the data, so there are other factors that could be interesting to this analysis.
+  + Rider Age: Understanding differences among age groups could be instrumental in creating a more diverse marketing strategy to accommodate everyone. 
+  + Income level: Breakdown on income would show possible economic factors that explain more differences between the casual and member riders and their respective economic barrier of entry.
+  + Home location: Using geographical data relevant to a rider may be a significant impact for strategic placement of advertisements.
+
+<br>
+<br>
